@@ -459,9 +459,26 @@ psi_lat_groups_df <- read_rds(here("export data/predictions_psi.rds")) |>
          lat_group = case_when(abs(lat) <=35 ~ "Low-Latitude",
                                abs(lat) > 35 ~ "High-Latitude")) |> 
   group_by(lat_group) |> 
-  count(win_or_lose))
+  ungroup() |> 
+  count(win_or_lose)
 
+psi_lat_groups_int <- read_rds(here("export data/predictions_psi.rds")) |> 
+  group_by(reference, species, order, family, id_pop, id_location, month) |> 
+  summarise(psi = mean(psi),
+            lat = mean(lat)) |> 
+  mutate(win_or_lose = case_when(psi < 0 ~ as_factor("losers"),
+                                 psi >= 0 ~ as_factor("winners")),
+         lat_group = case_when(abs(lat) <=35 ~ "Low-Latitude",
+                               abs(lat) > 35 ~ "High-Latitude")) |> 
+  group_by(lat_group, id_pop, reference, species) |> 
+  mutate(winner = ifelse(win_or_lose == "winners",
+                         1,
+                         0))
 
+winlose_lat_test <- glmmTMB::glmmTMB(winner ~ lat_group + (1 | species) + (1 | reference),
+                                     family = binomial,
+                                     data = psi_lat_groups_int)
+summary(winlose_lat_test)
 # 5. Visualization maps -----------------------------------------------------------------
 
 
@@ -793,7 +810,7 @@ intrapests_future_risk_leaflet <- intrapests_future_risk_leaflet %>%
             title = "Performance shift",
             position = "bottomleft")
 
-save(intrapests_future_risk_leaflet, file = here("figures/supporting information figures/intrapests_future_risk_leaflet.RData"))
+#save(intrapests_future_risk_leaflet, file = here("figures/supporting information figures/intrapests_future_risk_leaflet.RData"))
 htmlwidgets::saveWidget(intrapests_future_risk_leaflet,
            file = here("index.html"))
 
